@@ -40,10 +40,14 @@ const client = new Client({
 });
 
 client.on('qr', (qr) => {
-    console.log('පහත QR එක ස්කෑන් කරන්න:');
+    console.log('SCAN THIS QR CODE:');
+    // ලොග් එකේ පේන්න QR එක ජෙනරේට් කරනවා
     qrcode.generate(qr, { small: true });
+    
+    // QR එක ලින්ක් එකක් විදිහටත් දෙනවා (ලොග් එකේ පේන්න නැත්නම් මේක පාවිච්චි කරන්න පුළුවන්)
+    console.log('If the QR is not clear, use this link to generate it:');
+    console.log(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
 });
-
 client.on('ready', () => {
     console.log('[SUCCESS] HAZA AI සූදානම්! 🚀');
 });
