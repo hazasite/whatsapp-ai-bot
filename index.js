@@ -6,9 +6,9 @@ const express = require('express');
 const app = express();
 const port = process.env.PORT || 10000;
 
-// Render එකට අවශ්‍ය වෙබ් සර්වර් එක
+// Render එකට අවශ්‍ය වෙබ් සර්වර් එක (Health Check)
 app.get('/', (req, res) => {
-    res.send('HAZA AI බොට් සාර්ථකව ක්‍රියාත්මක වේ!');
+    res.send('<h1>HAZA AI බොට් සාර්ථකව ක්‍රියාත්මක වේ!</h1><p>ලොග්ස් පරීක්ෂා කර QR එක ස්කෑන් කරන්න.</p>');
 });
 
 app.listen(port, () => {
@@ -34,20 +34,23 @@ const client = new Client({
             '--disable-dev-shm-usage',
             '--disable-gpu'
         ],
-        // Windows සහ Linux දෙකටම ගැළපෙන විදිහට path එක සකස් කර ඇත
+        // සර්වර් එකේ Chromium තියෙන තැන
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium'
     }
 });
 
 client.on('qr', (qr) => {
-    console.log('SCAN THIS QR CODE:');
-    // ලොග් එකේ පේන්න QR එක ජෙනරේට් කරනවා
+    console.log('--- QR CODE START ---');
+    // 1. ටර්මිනල් එකේ QR එක පෙන්වයි
     qrcode.generate(qr, { small: true });
     
-    // QR එක ලින්ක් එකක් විදිහටත් දෙනවා (ලොග් එකේ පේන්න නැත්නම් මේක පාවිච්චි කරන්න පුළුවන්)
-    console.log('If the QR is not clear, use this link to generate it:');
-    console.log(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
+    // 2. ලොග් එකේ QR එක පේන්න නැත්නම් මේ ලින්ක් එක පාවිච්චි කරන්න
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
+    console.log('\n--- IMPORTANT: QR LINK ---');
+    console.log(qrImageUrl);
+    console.log('--- IMPORTANT: QR LINK ---\n');
 });
+
 client.on('ready', () => {
     console.log('[SUCCESS] HAZA AI සූදානම්! 🚀');
 });
@@ -64,7 +67,7 @@ client.on('message', async (message) => {
         });
         message.reply(response.choices[0].message.content);
     } catch (e) {
-        console.error('Error with OpenAI:', e);
+        console.error('Error with OpenAI API:', e);
     }
 });
 
