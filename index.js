@@ -51,15 +51,21 @@ client.on('ready', () => {
 });
 
 client.on('message', async (message) => {
-    // ... කලින් තිබුණු message handle කරන කෝඩ් එකම මෙතනට දාන්න ...
     if (message.fromMe) return;
+    
+    // Test: AI එකට යවන්න කලින් මේක වැඩද බලමු
+    if (message.body.toLowerCase() === 'hi') {
+        message.reply('Haza AI වැඩ මචං! දැන් AI එක කනෙක්ට් කරන එක විතරයි ඉතිරි.');
+        return;
+    }
+
+    // AI කොටස...
     try {
-        const response = await openai.chat.completions.create({
-            model: "stepfun/step-3.5-flash:free",
-            messages: [{ role: "user", content: message.body }]
-        });
-        message.reply(response.choices[0].message.content);
-    } catch (e) { console.error(e); }
-});
+        // ... කලින් තිබුණු openai කෝඩ් එක ...
+    } catch (e) {
+        console.error(e);
+        message.reply('AI එකේ මොකක් හරි අවුලක් මචං. ලොග් එක බලන්න.');
+    }
+});;
 
 client.initialize();
