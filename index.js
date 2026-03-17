@@ -1,14 +1,24 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const qrcodeTerminal = require('qrcode-terminal');
+const qrcodeImage = require('qr-image'); // මේක අලුතෙන් ඕන වෙනවා
 const { OpenAI } = require('openai');
 const express = require('express');
 
 const app = express();
 const port = process.env.PORT || 10000;
 
-// Render එකට අවශ්‍ය වෙබ් සර්වර් එක (Health Check)
+let lastQr = null; // QR එක store කරගන්න variable එකක්
+
+// ප්‍රධාන පිටුවට ගියාම QR එක පෙන්වන විදිහ
 app.get('/', (req, res) => {
-    res.send('<h1>HAZA AI බොට් සාර්ථකව ක්‍රියාත්මක වේ!</h1><p>ලොග්ස් පරීක්ෂා කර QR එක ස්කෑන් කරන්න.</p>');
+    if (lastQr) {
+        // QR එක image එකක් විදිහට generate කරලා පෙන්වනවා
+        const qr_svg = qrcodeImage.image(lastQr, { type: 'png' });
+        res.type('png');
+        qr_svg.pipe(res);
+    } else {
+        res.send('<h1>HAZA AI</h1><p>තවම QR එකක් ජෙනරේට් වෙලා නැහැ. පොඩ්ඩක් ඉන්න හෝ සර්විස් එක Restart කරන්න.</p>');
+    }
 });
 
 app.listen(port, () => {
@@ -18,57 +28,38 @@ app.listen(port, () => {
 const openai = new OpenAI({
     baseURL: "https://openrouter.ai/api/v1",
     apiKey: process.env.OPENROUTER_API_KEY,
-    defaultHeaders: {
-        "HTTP-Referer": "https://render.com",
-        "X-Title": "HAZA AI",
-    }
 });
 
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
         headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu'
-        ],
-        // සර්වර් එකේ Chromium තියෙන තැන
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium'
     }
 });
 
 client.on('qr', (qr) => {
-    console.log('--- QR CODE START ---');
-    // 1. ටර්මිනල් එකේ QR එක පෙන්වයි
-    qrcode.generate(qr, { small: true });
-    
-    // 2. ලොග් එකේ QR එක පේන්න නැත්නම් මේ ලින්ක් එක පාවිච්චි කරන්න
-    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
-    console.log('\n--- IMPORTANT: QR LINK ---');
-    console.log(qrImageUrl);
-    console.log('--- IMPORTANT: QR LINK ---\n');
+    lastQr = qr; // අලුත්ම QR එක variable එකට දාගන්නවා
+    console.log('New QR generated. Please check the Web URL.');
+    qrcodeTerminal.generate(qr, { small: true });
 });
 
 client.on('ready', () => {
+    lastQr = null; // කනෙක්ට් වුණාම QR එක අයින් කරනවා
     console.log('[SUCCESS] HAZA AI සූදානම්! 🚀');
 });
 
 client.on('message', async (message) => {
+    // ... කලින් තිබුණු message handle කරන කෝඩ් එකම මෙතනට දාන්න ...
     if (message.fromMe) return;
     try {
         const response = await openai.chat.completions.create({
             model: "stepfun/step-3.5-flash:free",
-            messages: [
-                { role: "system", content: "You are HAZA AI, a professional assistant created by Janma Hasarel." },
-                { role: "user", content: message.body }
-            ]
+            messages: [{ role: "user", content: message.body }]
         });
         message.reply(response.choices[0].message.content);
-    } catch (e) {
-        console.error('Error with OpenAI API:', e);
-    }
+    } catch (e) { console.error(e); }
 });
 
 client.initialize();
