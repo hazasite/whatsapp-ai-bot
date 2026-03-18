@@ -34,11 +34,16 @@ const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium'
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu'
+        ],
+        // Termux එකේ Chromium තියෙන Path එක:
+        executablePath: '/data/data/com.termux/files/usr/bin/chromium'
     }
 });
-
 client.on('qr', (qr) => {
     lastQr = qr; // අලුත්ම QR එක variable එකට දාගන්නවා
     console.log('New QR generated. Please check the Web URL.');
