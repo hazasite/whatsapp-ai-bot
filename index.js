@@ -3,18 +3,17 @@ const { Boom } = require('@hapi/boom');
 const qrcode = require('qrcode-terminal');
 const { OpenAI } = require('openai');
 
-// OpenAI Setup
 const openai = new OpenAI({
     baseURL: "https://openrouter.ai/api/v1",
     apiKey: process.env.OPENROUTER_API_KEY,
 });
 
 async function startHazaAI() {
-    const { state, saveCreds } = await useMultiFileAuthState('haza_auth_info');
+    const { state, saveCreds } = await useMultiFileAuthState('haza_sessions');
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: true, // මෙතනින් කෙලින්ම QR එක පෙන්වයි
+        printQRInTerminal: true,
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -22,14 +21,14 @@ async function startHazaAI() {
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
         if (qr) {
+            console.log('--- SCAN THE QR CODE ---');
             qrcode.generate(qr, { small: true });
         }
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('සම්බන්ධතාවය විසන්ධි වුණා. නැවත උත්සාහ කරනවා...', shouldReconnect);
             if (shouldReconnect) startHazaAI();
         } else if (connection === 'open') {
-            console.log('[SUCCESS] HAZA AI දැන් සක්‍රියයි! 🚀');
+            console.log('[SUCCESS] HAZA AI සූදානම්! 🚀');
         }
     });
 
@@ -47,7 +46,7 @@ async function startHazaAI() {
                 const aiResponse = await openai.chat.completions.create({
                     model: "stepfun/step-3.5-flash:free",
                     messages: [
-                        { role: "system", content: "You are HAZA AI, created by Janma Hasarel." },
+                        { role: "system", content: "You are HAZA AI, a professional assistant created by Janma Hasarel." },
                         { role: "user", content: text }
                     ]
                 });
