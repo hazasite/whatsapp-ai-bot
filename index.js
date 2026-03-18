@@ -1,81 +1,63 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcodeTerminal = require('qrcode-terminal');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { Boom } = require('@hapi/boom');
+const qrcode = require('qrcode-terminal');
 const { OpenAI } = require('openai');
-const express = require('express');
-const qrcodeImage = require('qr-image');
 
-const app = express();
-const port = process.env.PORT || 10000;
-let lastQr = null;
-
-// Web Server to view QR
-app.get('/', (req, res) => {
-    if (lastQr) {
-        const qr_png = qrcodeImage.image(lastQr, { type: 'png' });
-        res.type('png');
-        qr_png.pipe(res);
-    } else {
-        res.send('<h1>HAZA AI</h1><p>QR එක ජෙනරේට් වෙනකම් පොඩ්ඩක් ඉන්න මචං...</p>');
-    }
-});
-
-app.listen(port, () => {
-    console.log(`Web Server started on port ${port}`);
-});
-
-// OpenAI/OpenRouter Setup
+// OpenAI Setup
 const openai = new OpenAI({
     baseURL: "https://openrouter.ai/api/v1",
     apiKey: process.env.OPENROUTER_API_KEY,
-    defaultHeaders: {
-        "HTTP-Referer": "https://haza.lk", // Just a placeholder
-        "X-Title": "HAZA AI",
-    }
 });
 
-// WhatsApp Client Setup
-const client = new Client({
-    authStrategy: new LocalAuth(),
-    puppeteer: {
-        headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu'
-        ],
-        // මෙන්න මේ පාත් එක තමයි වැදගත්ම දේ!
-        executablePath: '/data/data/com.termux/files/usr/bin/chromium'
-    }
-});
+async function startHazaAI() {
+    const { state, saveCreds } = await useMultiFileAuthState('haza_auth_info');
 
-client.on('qr', (qr) => {
-    lastQr = qr;
-    console.log('--- NEW QR GENERATED ---');
-    qrcodeTerminal.generate(qr, { small: true });
-    console.log('Scan above or visit: http://localhost:10000');
-});
+    const sock = makeWASocket({
+        auth: state,
+        printQRInTerminal: true, // මෙතනින් කෙලින්ම QR එක පෙන්වයි
+    });
 
-client.on('ready', () => {
-    lastQr = null;
-    console.log('[SUCCESS] HAZA AI සූදානම්! 🚀');
-});
+    sock.ev.on('creds.update', saveCreds);
 
-client.on('message', async (message) => {
-    if (message.fromMe) return;
+    sock.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect, qr } = update;
+        if (qr) {
+            qrcode.generate(qr, { small: true });
+        }
+        if (connection === 'close') {
+            const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
+            console.log('සම්බන්ධතාවය විසන්ධි වුණා. නැවත උත්සාහ කරනවා...', shouldReconnect);
+            if (shouldReconnect) startHazaAI();
+        } else if (connection === 'open') {
+            console.log('[SUCCESS] HAZA AI දැන් සක්‍රියයි! 🚀');
+        }
+    });
 
-    try {
-        const response = await openai.chat.completions.create({
-            model: "stepfun/step-3.5-flash:free",
-            messages: [
-                { role: "system", content: "You are HAZA AI, a helpful assistant." },
-                { role: "user", content: message.body }
-            ]
-        });
-        message.reply(response.choices[0].message.content);
-    } catch (e) {
-        console.error('API Error:', e.message);
-    }
-});
+    sock.ev.on('messages.upsert', async ({ messages, type }) => {
+        if (type === 'notify') {
+            const msg = messages[0];
+            if (!msg.message || msg.key.fromMe) return;
 
-client.initialize();
+            const text = msg.message.conversation || msg.message.extendedTextMessage?.text;
+            if (!text) return;
+
+            const from = msg.key.remoteJid;
+
+            try {
+                const aiResponse = await openai.chat.completions.create({
+                    model: "stepfun/step-3.5-flash:free",
+                    messages: [
+                        { role: "system", content: "You are HAZA AI, created by Janma Hasarel." },
+                        { role: "user", content: text }
+                    ]
+                });
+
+                await sock.sendMessage(from, { text: aiResponse.choices[0].message.content });
+            } catch (e) {
+                console.error("AI Error:", e.message);
+            }
+        }
+    });
+}
+
+startHazaAI();
