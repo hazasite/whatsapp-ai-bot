@@ -27,7 +27,7 @@ app.listen(port, () => {
 
 const openai = new OpenAI({
     baseURL: "https://openrouter.ai/api/v1",
-    apiKey: process.env.OPENROUTER_API_KEY,
+    apiKey: process.env.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,
 });
 
 const client = new Client({
